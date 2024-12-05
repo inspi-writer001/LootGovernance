@@ -1,66 +1,138 @@
-## Foundry
+# LootGovernor - Governance System for Loot NFT Holders
 
-**Foundry is a blazing fast, portable and modular toolkit for Ethereum application development written in Rust.**
+LootGovernor is a governance system that enables Loot NFT holders to participate in decentralized decision-making. The system uses a timelock mechanism for security and is upgradeable using the UUPS (Universal Upgradeable Proxy Standard) pattern.
 
-Foundry consists of:
+## Overview
 
--   **Forge**: Ethereum testing framework (like Truffle, Hardhat and DappTools).
--   **Cast**: Swiss army knife for interacting with EVM smart contracts, sending transactions and getting chain data.
--   **Anvil**: Local Ethereum node, akin to Ganache, Hardhat Network.
--   **Chisel**: Fast, utilitarian, and verbose solidity REPL.
+The governance system consists of three main components:
 
-## Documentation
+1. **LootGovernor**: The main governance contract that handles proposals and voting
+2. **LootTimelock**: A timelock controller that enforces a delay before executing approved proposals
+3. **Proxy**: An ERC1967 proxy that enables upgradeability
 
-https://book.getfoundry.sh/
+## Key Features
 
-## Usage
+- **Voting Power**: Based on Loot NFT holdings (1 NFT = 1 vote)
+- **Proposal Threshold**: 8 Loot NFTs required to create proposals
+- **Quorum**: 155 votes required for proposal to pass
+- **Timelock**: 1 hour delay before execution
+- **Voting Period**: 1 week
+- **Voting Delay**: 1 day after proposal creation before voting starts
 
-### Build
+## Deployment Instructions
 
-```shell
-$ forge build
+1. Create a `.env` file with your private key:
+```env
+PRIVATE_KEY=your_private_key_here
+RPC_URL=your_ethereum_rpc_url
 ```
 
-### Test
-
-```shell
-$ forge test
+2. Deploy using Foundry:
+```bash
+forge script script/DeployLootGovernance.s.sol:DeployLootGovernance \
+    --rpc-url $RPC_URL \
+    --broadcast \
+    --verify
 ```
 
-### Format
+3. Save the deployed addresses that are output in the console:
+- Timelock address
+- Governor Implementation address
+- Governor Proxy address
 
-```shell
-$ forge fmt
+## Creating Proposals
+
+Holders of at least 8 Loot NFTs can create proposals:
+
+```solidity
+governor.propose(
+    targets,     // Array of target addresses
+    values,      // Array of ETH values
+    calldatas,   // Array of function calls
+    description  // Proposal description
+);
 ```
 
-### Gas Snapshots
+## Voting Process
 
-```shell
-$ forge snapshot
+1. After proposal creation, there's a 1-day delay before voting starts
+2. Voting period lasts 1 week
+3. Quorum of 155 votes needed
+4. Each Loot NFT counts as 1 vote
+5. Voting options: For (1), Against (0), or Abstain (2)
+
+## Timelock Execution
+
+If a proposal passes:
+1. It must be queued in the timelock
+2. After 1 hour delay, anyone can execute the proposal
+
+## Contract Upgradeability
+
+The system is upgradeable using the UUPS pattern. Only the contract owner can perform upgrades.
+
+### How to Upgrade
+
+1. Deploy new implementation:
+```solidity
+LootGovernor newImplementation = new LootGovernor();
 ```
 
-### Anvil
-
-```shell
-$ anvil
+2. Call upgrade on the proxy:
+```solidity
+// Through the proxy
+governor.upgradeToAndCall(
+    address(newImplementation),
+    ""  // No initialization data needed
+);
 ```
 
-### Deploy
+### Security Considerations
 
-```shell
-$ forge script script/Counter.s.sol:CounterScript --rpc-url <your_rpc_url> --private-key <your_private_key>
+- Upgrades can only be performed by the owner
+- The owner should be a secure multisig or DAO
+- All upgrades should be thoroughly tested
+- Consider using a timelock for upgrades
+
+## Contract Verification
+
+After deployment, verify your contracts on Etherscan:
+```bash
+forge verify-contract \
+    --chain-id 1 \
+    --compiler-version v0.8.19 \
+    CONTRACT_ADDRESS \
+    src/LootGovernor.sol:LootGovernor \
+    YOUR_ETHERSCAN_API_KEY
 ```
 
-### Cast
+## Important Notes
 
-```shell
-$ cast <subcommand>
-```
+- Keep track of the proxy address - this is the main address to interact with
+- The implementation contract should not receive any funds
+- All interactions should be through the proxy
+- Test thoroughly before upgrading
+- Consider using a multisig as the owner for added security
 
-### Help
+## Roles
 
-```shell
-$ forge --help
-$ anvil --help
-$ cast --help
-```
+- **Owner**: Can upgrade the contract
+- **Proposers**: Loot holders with ≥ 8 NFTs
+- **Voters**: Any Loot holder
+- **Executors**: Anyone can execute passed proposals
+- **Timelock Admin**: Renounced after setup
+
+## Technical Specifications
+
+- Solidity Version: ^0.8.19
+- Framework: Foundry
+- Dependencies: OpenZeppelin Contracts Upgradeable 4.8.0
+- Network: Ethereum Mainnet
+- Loot Contract: 0xFF9C1b15B16263C61d017ee9F65C50e4AE0113D7
+
+## Security
+
+- All functions are protected against reentrancy
+- Timelock adds security by delaying execution
+- Upgrades are restricted to owner only
+- Critical functions are protected by access control

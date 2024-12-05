@@ -6,7 +6,6 @@ import {LootGovernor, LootTimelock} from "../src/LootGovernor.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 contract DeployLootGovernance is Script {
-    // Configuration
     uint256 public constant MIN_DELAY = 3600; // 1 hour
     uint256 public constant VOTING_DELAY = 7200; // 1 day
     uint256 public constant VOTING_PERIOD = 50400; // 1 week
@@ -19,9 +18,10 @@ contract DeployLootGovernance is Script {
         vm.startBroadcast(deployerPrivateKey);
 
         // Deploy Timelock
-        address[] memory proposers;
-        address[] memory executors;
-        LootTimelock timelock = new LootTimelock(
+        address[] memory proposers = new address[](0);
+        address[] memory executors = new address[](0);
+        LootTimelock timelock = new LootTimelock();
+        timelock.initialize(
             MIN_DELAY,
             proposers,
             executors,
@@ -47,13 +47,12 @@ contract DeployLootGovernance is Script {
             initData
         );
 
-        // Get Governor instance
-        LootGovernor governor = LootGovernor(address(proxy));
+        LootGovernor governor = LootGovernor(payable(address(proxy)));
 
         // Setup roles
         bytes32 proposerRole = timelock.PROPOSER_ROLE();
         bytes32 executorRole = timelock.EXECUTOR_ROLE();
-        bytes32 adminRole = timelock.TIMELOCK_ADMIN_ROLE();
+        bytes32 adminRole = timelock.DEFAULT_ADMIN_ROLE();  
 
         timelock.grantRole(proposerRole, address(governor));
         timelock.grantRole(executorRole, address(0));

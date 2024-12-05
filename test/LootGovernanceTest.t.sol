@@ -2,18 +2,17 @@
 pragma solidity ^0.8.19;
 
 import "forge-std/Test.sol";
+import "forge-std/interfaces/IERC721.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {LootGovernor, LootTimelock} from "../src/LootGovernor.sol";
 import {IVotes} from "@openzeppelin/contracts/governance/utils/IVotes.sol";
 import {IGovernor} from "@openzeppelin/contracts/governance/IGovernor.sol";
+import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 contract LootGovernanceTest is Test {
     LootGovernor public governor;
     LootTimelock public timelock;
     address public constant LOOT = 0xFF9C1b15B16263C61d017ee9F65C50e4AE0113D7;
-    
-    address[] public proposers;
-    address[] public executors;
     
     uint256 public constant MIN_DELAY = 3600; 
     uint256 public constant VOTING_DELAY = 7200; 
@@ -21,50 +20,77 @@ contract LootGovernanceTest is Test {
 
     address public constant WHALE = 0x450638DaF0CAeDBdd9F8cb4A41Fa1b24788b123e;
     
-    function setUp() public {
-        // Fork mainnet
+    function setUp() public {        
         vm.createSelectFork(vm.envString("ETH_RPC_URL"));
         
-        // Deploy timelock
-        timelock = new LootTimelock(
+        
+        LootTimelock timelockImpl = new LootTimelock();
+        
+        
+        address[] memory initialProposers = new address[](0);
+        address[] memory initialExecutors = new address[](1);
+        initialExecutors[0] = address(0); 
+        
+        bytes memory timelockInitData = abi.encodeWithSelector(
+            LootTimelock.initialize.selector,
             MIN_DELAY,
-            proposers,
-            executors,
+            initialProposers,
+            initialExecutors,
             address(this)
         );
         
-        // Deploy implementation
+        
+        ERC1967Proxy timelockProxy = new ERC1967Proxy(
+            address(timelockImpl),
+            timelockInitData
+        );
+        
+        
+        timelock = LootTimelock(payable(address(timelockProxy)));
+        
+        
         LootGovernor implementation = new LootGovernor();
 
-        // Prepare initialization data
-        bytes memory initData = abi.encodeWithSelector(
+        
+        bytes memory governorInitData = abi.encodeWithSelector(
             LootGovernor.initialize.selector,
             LOOT,
-            address(timelock),
+            timelock,
             VOTING_DELAY,
             VOTING_PERIOD,
             address(this)
         );
 
-        // Deploy proxy
-        ERC1967Proxy proxy = new ERC1967Proxy(
+        // Deploy governor proxy
+        ERC1967Proxy governorProxy = new ERC1967Proxy(
             address(implementation),
-            initData
+            governorInitData
         );
 
-        governor = LootGovernor(address(proxy));
+        // Cast proxy to governor
+        governor = LootGovernor(payable(address(governorProxy)));
         
         // Setup roles
         bytes32 proposerRole = timelock.PROPOSER_ROLE();
         bytes32 executorRole = timelock.EXECUTOR_ROLE();
-        bytes32 adminRole = timelock.TIMELOCK_ADMIN_ROLE();
+        bytes32 adminRole = timelock.DEFAULT_ADMIN_ROLE();
 
+        // Grant governor the proposer role
         timelock.grantRole(proposerRole, address(governor));
+        // Grant everyone executor role
         timelock.grantRole(executorRole, address(0));
+        // Renounce admin role
         timelock.revokeRole(adminRole, address(this));
     }
 
-    function testInitialSetup() public {
+    function testInitialization() public view {
+        assertEq(governor.votingDelay(), VOTING_DELAY);
+        assertEq(governor.votingPeriod(), VOTING_PERIOD);
+        assertEq(address(governor.timelock()), address(timelock));
+        assertEq(address(governor.loot()), LOOT); 
+    }
+
+    function testInitialSetup() public view {
         assertEq(governor.name(), "LootGovernor");
         assertEq(governor.votingDelay(), VOTING_DELAY);
         assertEq(governor.votingPeriod(), VOTING_PERIOD);
@@ -72,25 +98,46 @@ contract LootGovernanceTest is Test {
         assertEq(governor.quorum(0), 155);
     }
 
-    function testProposalThreshold() public {
+    function testProposalThreshold() public view {
         assertEq(governor.proposalThreshold(), 8);
     }
 
-    function testQuorum() public {
+    function testQuorum() public view {
         assertEq(governor.quorum(0), 155);
         assertEq(governor.quorum(100), 155); 
     }
 
     function testCreateProposal() public {
-        // Impersonate a whale account
+        // Mint some Loot NFTs to WHALE for testing
         vm.startPrank(WHALE);
+        
+        // We need to ensure WHALE has at least 1 Loot NFT to create proposal
+        uint256 whaleBalance = IERC721(LOOT).balanceOf(WHALE);
+        if(whaleBalance == 0) {
+            // If WHALE doesn't have any Loot, we'll mint one
+            // Note: This assumes there are unclaimed Loot tokens available
+            uint256 tokenId = 1;
+            while(tokenId < 7778) {
+                try IERC721(LOOT).ownerOf(tokenId) {
+                    tokenId++;
+                    continue;
+                } catch {
+                    // Found an unclaimed token
+                    (bool success,) = LOOT.call(
+                        abi.encodeWithSignature("claim(uint256)", tokenId)
+                    );
+                    require(success, "Failed to claim Loot");
+                    break;
+                }
+            }
+        }
         
         // Create proposal
         address[] memory targets = new address[](1);
         uint256[] memory values = new uint256[](1);
         bytes[] memory calldatas = new bytes[](1);
         
-        targets[0] = address(LOOT);
+        targets[0] = LOOT;
         values[0] = 0;
         calldatas[0] = abi.encodeWithSignature("transferOwnership(address)", address(this));
         
@@ -114,31 +161,39 @@ contract LootGovernanceTest is Test {
         // Deploy new implementation
         LootGovernor newImplementation = new LootGovernor();
         
-        // Upgrade
-        governor.upgradeTo(address(newImplementation));
+        // Cast to proxy and upgrade
+        (bool success,) = address(governor).call(
+            abi.encodeWithSignature(
+                "upgradeToAndCall(address,bytes)", 
+                address(newImplementation),
+                ""
+            )
+        );
+        require(success, "Upgrade failed");
         
         // Check implementation
-        address currentImpl = vm.load(
+        // bytes32(uint256(keccak256('eip1967.proxy.implementation')) - 1)
+        bytes32 implSlot = vm.load(
             address(governor),
             0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc
         );
+        address currentImpl = address(uint160(uint256(implSlot)));
         assertEq(currentImpl, address(newImplementation));
     }
 
-    function testFullProposalWorkflow() public {
-        // Impersonate a whale account
+    function testFullProposalWorkflow() public {        
         vm.startPrank(WHALE);
-        
-        // Create proposal
+                
         address[] memory targets = new address[](1);
         uint256[] memory values = new uint256[](1);
         bytes[] memory calldatas = new bytes[](1);
         
-        targets[0] = address(LOOT);
-        values[0] = 0;
-        calldatas[0] = abi.encodeWithSignature("transferOwnership(address)", address(this));
+                
+        targets[0] = address(timelock);
+        values[0] = 1 ether;
+        calldatas[0] = ""; 
         
-        string memory description = "Transfer ownership of Loot";
+        string memory description = "Send 1 ETH to treasury";
         uint256 proposalId = governor.propose(
             targets,
             values,
@@ -146,23 +201,30 @@ contract LootGovernanceTest is Test {
             description
         );
         
-        // Advance to voting period
+        
+        uint256 votes = governor.getVotes(WHALE, block.number - 1);
+        console.log("Whale voting power:", votes);
+        
+        
         vm.roll(block.number + governor.votingDelay() + 1);
         
-        // Cast vote
+        
         governor.castVote(proposalId, 1); 
         
-        // Advance to end of voting period
+        
         vm.roll(block.number + governor.votingPeriod() + 1);
         
-        // Queue
+        
         bytes32 descriptionHash = keccak256(bytes(description));
         governor.queue(targets, values, calldatas, descriptionHash);
         
-        // Advance time
+        
+        vm.deal(address(timelock), 2 ether);
+        
+        
         vm.warp(block.timestamp + timelock.getMinDelay() + 1);
         
-        // Execute
+        
         governor.execute(targets, values, calldatas, descriptionHash);
         
         vm.stopPrank();
