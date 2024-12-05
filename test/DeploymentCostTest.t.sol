@@ -11,23 +11,26 @@ contract DeploymentCostTest is Test {
     uint256 public constant VOTING_DELAY = 7200; // 1 day
     uint256 public constant VOTING_PERIOD = 50400; // 1 week
     address public constant LOOT = 0xFF9C1b15B16263C61d017ee9F65C50e4AE0113D7;
+    
+    // Contract instances
+    LootTimelock public timelock;
+    LootGovernor public governor;
+    uint256 public startGas;
 
     function setUp() public {
         // Fork mainnet
         vm.createSelectFork(vm.envString("ETH_RPC_URL"));
+        startGas = gasleft();
     }
 
-    function testDeploymentCost() public {
-        // Start tracking gas
-        uint256 startGas = gasleft();
-
+    function deployTimelock() internal returns (LootTimelock) {
         // Deploy Timelock implementation
         LootTimelock timelockImpl = new LootTimelock();
         
-        // Prepare timelock initialization data
+        // Prepare initialization data
         address[] memory initialProposers = new address[](0);
         address[] memory initialExecutors = new address[](1);
-        initialExecutors[0] = address(0); // Allow anyone to execute
+        initialExecutors[0] = address(0);
         
         bytes memory timelockInitData = abi.encodeWithSelector(
             LootTimelock.initialize.selector,
@@ -37,56 +40,56 @@ contract DeploymentCostTest is Test {
             address(this)
         );
         
-        // Deploy timelock proxy
+        // Deploy and initialize proxy
         ERC1967Proxy timelockProxy = new ERC1967Proxy(
             address(timelockImpl),
             timelockInitData
         );
         
-        // Cast proxy to timelock
-        LootTimelock timelock = LootTimelock(payable(address(timelockProxy)));
+        console.log("Timelock Implementation:", address(timelockImpl));
+        console.log("Timelock Proxy:", address(timelockProxy));
         
-        // Deploy governor implementation
+        return LootTimelock(payable(address(timelockProxy)));
+    }
+
+    function deployGovernor(LootTimelock _timelock) internal returns (LootGovernor) {
+        // Deploy implementation
         LootGovernor implementation = new LootGovernor();
 
-        // Prepare governor initialization data
         bytes memory governorInitData = abi.encodeWithSelector(
             LootGovernor.initialize.selector,
             LOOT,
-            timelock,
+            _timelock,
             VOTING_DELAY,
             VOTING_PERIOD,
             address(this)
         );
 
-        // Deploy governor proxy
+        // Deploy and initialize proxy
         ERC1967Proxy governorProxy = new ERC1967Proxy(
             address(implementation),
             governorInitData
         );
         
-        // Cast proxy to governor
-        LootGovernor governor = LootGovernor(payable(address(governorProxy)));
+        console.log("Governor Implementation:", address(implementation));
+        console.log("Governor Proxy:", address(governorProxy));
         
-        // Setup roles
-        bytes32 proposerRole = timelock.PROPOSER_ROLE();
-        bytes32 executorRole = timelock.EXECUTOR_ROLE();
-        bytes32 adminRole = timelock.DEFAULT_ADMIN_ROLE();
+        return LootGovernor(payable(address(governorProxy)));
+    }
 
-        // Grant governor the proposer role
-        timelock.grantRole(proposerRole, address(governor));
-        // Grant everyone executor role
-        timelock.grantRole(executorRole, address(0));
-        // Renounce admin role
-        timelock.revokeRole(adminRole, address(this));
+    function setupRoles(LootTimelock _timelock, LootGovernor _governor) internal {
+        bytes32 proposerRole = _timelock.PROPOSER_ROLE();
+        bytes32 executorRole = _timelock.EXECUTOR_ROLE();
+        bytes32 adminRole = _timelock.DEFAULT_ADMIN_ROLE();
 
-        // Calculate total gas used
+        _timelock.grantRole(proposerRole, address(_governor));
+        _timelock.grantRole(executorRole, address(0));
+        _timelock.revokeRole(adminRole, address(this));
+    }
+
+    function logDeploymentCosts() internal {
         uint256 gasUsed = startGas - gasleft();
-
-        // Get current gas price from mainnet fork
         uint256 gasPrice = block.basefee;
-        
-        // Calculate total cost in ETH
         uint256 totalCostWei = gasUsed * gasPrice;
         uint256 totalCostEth = totalCostWei / 1e18;
 
@@ -94,15 +97,20 @@ contract DeploymentCostTest is Test {
         console.log("Current Gas Price (wei):", gasPrice);
         console.log("Total Cost (wei):", totalCostWei);
         console.log("Total Cost (ETH):", totalCostEth);
-        
-        // Log contract addresses
-        console.log("\nDeployed Contracts:");
-        console.log("Timelock Implementation:", address(timelockImpl));
-        console.log("Timelock Proxy:", address(timelockProxy));
-        console.log("Governor Implementation:", address(implementation));
-        console.log("Governor Proxy:", address(governorProxy));
+    }
 
-        // Test basic governor setup
+    function testDeploymentCost() public {
+        // Deploy contracts
+        timelock = deployTimelock();
+        governor = deployGovernor(timelock);
+        
+        // Setup roles
+        setupRoles(timelock, governor);
+        
+        // Log costs
+        logDeploymentCosts();
+
+        // Verify setup
         assertEq(address(governor.loot()), LOOT);
         assertEq(governor.votingDelay(), VOTING_DELAY);
         assertEq(governor.votingPeriod(), VOTING_PERIOD);

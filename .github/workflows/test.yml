@@ -8,7 +8,7 @@ on:
 
 env:
   FOUNDRY_PROFILE: ci
-  ETH_RPC_URL: https://eth.llamarpc.com
+  ETH_RPC_URL: ${{ secrets.ETH_RPC_URL }}
 
 jobs:
   check:
@@ -28,14 +28,14 @@ jobs:
         run: forge install
 
       - name: Run Tests
-        run: forge test -vvv
+        run: forge test -vvv --via-ir
         env:
-          ETH_RPC_URL: ${{ env.ETH_RPC_URL }}
+          ETH_RPC_URL: ${{ secrets.ETH_RPC_URL }}
 
       - name: Run Coverage
-        run: forge coverage --report lcov
+        run: forge coverage --via-ir --report lcov
         env:
-          ETH_RPC_URL: ${{ env.ETH_RPC_URL }}
+          ETH_RPC_URL: ${{ secrets.ETH_RPC_URL }}
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
