@@ -15,9 +15,9 @@ contract LootGovernanceTest is Test {
     address[] public proposers;
     address[] public executors;
     
-    uint256 public constant MIN_DELAY = 3600; // 1 hour
-    uint256 public constant VOTING_DELAY = 7200; // 1 day
-    uint256 public constant VOTING_PERIOD = 50400; // 1 week
+    uint256 public constant MIN_DELAY = 3600; 
+    uint256 public constant VOTING_DELAY = 7200; 
+    uint256 public constant VOTING_PERIOD = 50400; 
 
     address public constant WHALE = 0x450638DaF0CAeDBdd9F8cb4A41Fa1b24788b123e;
     
@@ -78,7 +78,7 @@ contract LootGovernanceTest is Test {
 
     function testQuorum() public {
         assertEq(governor.quorum(0), 155);
-        assertEq(governor.quorum(100), 155); // Should be constant regardless of block number
+        assertEq(governor.quorum(100), 155); 
     }
 
     function testCreateProposal() public {
@@ -150,7 +150,7 @@ contract LootGovernanceTest is Test {
         vm.roll(block.number + governor.votingDelay() + 1);
         
         // Cast vote
-        governor.castVote(proposalId, 1); // Vote in favor
+        governor.castVote(proposalId, 1); 
         
         // Advance to end of voting period
         vm.roll(block.number + governor.votingPeriod() + 1);

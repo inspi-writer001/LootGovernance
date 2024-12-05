@@ -39,8 +39,8 @@ contract LootGovernor is
     UUPSUpgradeable,
     OwnableUpgradeable
 {
-    uint256 public constant QUORUM_FIXED = 155; // Fixed quorum of 155 Loot bags
-    uint256 public constant PROPOSAL_THRESHOLD = 8; // 8 Loot bags to propose
+    uint256 public constant QUORUM_FIXED = 155; 
+    uint256 public constant PROPOSAL_THRESHOLD = 8; 
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
