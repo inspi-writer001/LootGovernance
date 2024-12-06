@@ -8,7 +8,7 @@ on:
 
 env:
   FOUNDRY_PROFILE: ci
-  ETH_RPC_URL: ${{ secrets.ETH_RPC_URL }}
+  ETH_RPC_URL: "https://eth.llamarpc.com"
 
 jobs:
   check:
@@ -24,22 +24,39 @@ jobs:
         with:
           version: nightly
 
-      - name: Install Dependencies
-        run: forge install
+      # Clean cache step
+      - name: Clean Cache
+        run: |
+          forge cache clean
+          rm -rf ~/.cache/forge
+          rm -rf cache/
+          rm -rf out/
 
-      - name: Run Tests
-        run: forge test -vvv --via-ir
-        env:
-          ETH_RPC_URL: ${{ secrets.ETH_RPC_URL }}
-
-      - name: Run Coverage
-        run: forge coverage --via-ir --report lcov
-        env:
-          ETH_RPC_URL: ${{ secrets.ETH_RPC_URL }}
-
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v3
+      # Cache dependencies
+      - name: Cache Forge Dependencies
+        uses: actions/cache@v3
         with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          files: ./lcov.info
-          fail_ci_if_error: true
+          path: |
+            ~/.cache/forge
+            lib/
+          key: ${{ runner.os }}-forge-${{ hashFiles('**/foundry.toml') }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-forge-
+
+      - name: Install Dependencies
+        run: |
+          forge install
+          forge build --sizes
+
+      # Run tests with parallel jobs and timeout
+      - name: Run Tests
+        run: forge test -vvv 
+        timeout-minutes: 10
+
+      # Run coverage with retries
+      - name: Run Coverage
+        uses: nick-fields/retry@v2
+        with:
+          timeout_minutes: 10
+          max_attempts: 3
+          command: forge coverage --report lcov

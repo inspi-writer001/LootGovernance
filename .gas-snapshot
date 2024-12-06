@@ -1,0 +1,8 @@
+DeploymentCostTest:testDeploymentCost() (gas: 5378820)
+LootGovernanceTest:testCreateProposal() (gas: 65948)
+LootGovernanceTest:testFullProposalWorkflow() (gas: 250934)
+LootGovernanceTest:testInitialSetup() (gas: 26889)
+LootGovernanceTest:testInitialization() (gas: 27928)
+LootGovernanceTest:testProposalThreshold() (gas: 14050)
+LootGovernanceTest:testQuorum() (gas: 16858)
+LootGovernanceTest:testUpgradeability() (gas: 3303324)
