@@ -36,36 +36,46 @@ contract LootGovernor is
     UUPSUpgradeable,
     OwnableUpgradeable
 {
-    IERC721 public loot;
+    // Using immutable for the Loot contract address can save gas
+    IERC721 public immutable loot;
+    
+    // Constants for governance parameters
     uint256 public constant QUORUM_FIXED = 155; 
-    uint256 public constant PROPOSAL_THRESHOLD = 8; 
+    uint256 public constant PROPOSAL_THRESHOLD = 8;
+
+    // Cache storage variables to reduce gas costs
+    uint32 private _votingDelay;
+    uint32 private _votingPeriod;
 
     /// @custom:oz-upgrades-unsafe-allow constructor
-    constructor() {
+    constructor(IERC721 _loot) {
         _disableInitializers();
+        loot = _loot; // Set immutable variable in constructor
     }
 
     function initialize(
-        IERC721 _loot,
         TimelockControllerUpgradeable _timelock,
-        uint256 _votingDelay,
-        uint256 _votingPeriod,
+        uint32 votingDelay_,
+        uint32 votingPeriod_,
         address initialOwner
     ) public initializer {
         __Governor_init("LootGovernor");
         __GovernorSettings_init(
-            uint32(_votingDelay),
-            uint32(_votingPeriod),
-            uint256(PROPOSAL_THRESHOLD)
+            votingDelay_,
+            votingPeriod_,
+            PROPOSAL_THRESHOLD
         );
         __GovernorCountingSimple_init();
         __GovernorTimelockControl_init(_timelock);
         __Ownable_init(initialOwner);
         __UUPSUpgradeable_init();
         
-        loot = _loot;
+        // Cache values
+        _votingDelay = votingDelay_;
+        _votingPeriod = votingPeriod_;
     }
 
+    // Using blocknumber for voting periods is more gas efficient than timestamps
     function clock() public view virtual override returns (uint48) {
         return uint48(block.number);
     }
@@ -80,7 +90,7 @@ contract LootGovernor is
         override(GovernorUpgradeable, GovernorSettingsUpgradeable)
         returns (uint256)
     {
-        return super.votingDelay();
+        return _votingDelay;
     }
 
     function votingPeriod()
@@ -89,9 +99,10 @@ contract LootGovernor is
         override(GovernorUpgradeable, GovernorSettingsUpgradeable)
         returns (uint256)
     {
-        return super.votingPeriod();
+        return _votingPeriod;
     }
 
+    // Using a constant return value is more gas efficient
     function quorum(uint256)
         public
         pure
@@ -110,6 +121,7 @@ contract LootGovernor is
         return super.state(proposalId);
     }
 
+    // Using a constant return value is more gas efficient
     function proposalThreshold()
         public
         pure
@@ -119,6 +131,7 @@ contract LootGovernor is
         return PROPOSAL_THRESHOLD;
     }
 
+    // Simplified voting power calculation - 1 Loot NFT = 1 vote
     function _getVotes(
         address account,
         uint256,
@@ -127,6 +140,7 @@ contract LootGovernor is
         return loot.balanceOf(account);
     }
 
+    // Always return true to ensure proposals go through timelock
     function proposalNeedsQueuing(uint256)
         public
         view
@@ -176,7 +190,7 @@ contract LootGovernor is
         return super._executor();
     }
 
-    function _authorizeUpgrade(address newImplementation)
+    function _authorizeUpgrade(address)
         internal
         override
         onlyOwner
