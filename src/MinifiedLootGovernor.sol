@@ -103,7 +103,8 @@ contract LootGovernor is
         uint256,
         bytes memory
     ) internal view override returns (uint256) {
-        return loot.balanceOf(account);
+        uint256 balance = loot.balanceOf(account);
+        return balance >= minNFTsRequired ? balance : 0; // Enforce minimum NFT holding
     }
 
     function updateMinNFTsRequired(uint256 newMin) external onlyGovernance {
