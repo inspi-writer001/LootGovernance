@@ -19,7 +19,10 @@ contract MockLoot is ERC721, Ownable {
     }
 
     function mintMultiple(address to, uint256 amount) external {
-        require(_tokenIdCounter + amount - 1 <= MAX_SUPPLY, "Would exceed max supply");
+        require(
+            _tokenIdCounter + amount - 1 <= MAX_SUPPLY,
+            "Would exceed max supply"
+        );
         for (uint256 i = 0; i < amount; i++) {
             _safeMint(to, _tokenIdCounter++);
         }
@@ -49,7 +52,7 @@ import "@openzeppelin/contracts/governance/Governor.sol";
 import "@openzeppelin/contracts/governance/extensions/GovernorSettings.sol";
 import "@openzeppelin/contracts/governance/extensions/GovernorCountingSimple.sol";
 import "@openzeppelin/contracts/governance/extensions/GovernorTimelockControl.sol";
-import "@openzeppelin/contracts/token/ERC721/IERC721.sol"; 
+import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 
 contract LootGovernor is
     Governor,
@@ -58,14 +61,17 @@ contract LootGovernor is
     GovernorTimelockControl
 {
     IERC721 public immutable loot;
-    uint256 public constant QUORUM_FIXED = 155;
+    uint256 public QUORUM_FIXED;
+    uint256 public minNFTsRequired;
 
     constructor(
         IERC721 _loot,
         TimelockController _timelock,
         uint256 _votingDelay,
         uint256 _votingPeriod,
-        uint256 _proposalThreshold
+        uint256 _proposalThreshold,
+        uint256 _quorum,
+        uint256 _minNFTsRequired
     )
         Governor("LootGovernor")
         GovernorSettings(
@@ -75,7 +81,9 @@ contract LootGovernor is
         )
         GovernorTimelockControl(_timelock)
     {
+        QUORUM_FIXED = _quorum;
         loot = _loot;
+        minNFTsRequired = _minNFTsRequired;
     }
 
     function clock() public view virtual override returns (uint48) {
@@ -86,7 +94,7 @@ contract LootGovernor is
         return "mode=blocknumber";
     }
 
-    function quorum(uint256) public pure override returns (uint256) {
+    function quorum(uint256) public view override returns (uint256) {
         return QUORUM_FIXED;
     }
 
@@ -98,23 +106,52 @@ contract LootGovernor is
         return loot.balanceOf(account);
     }
 
-    function votingDelay() public view override(Governor, GovernorSettings) returns (uint256) {
+    function updateMinNFTsRequired(uint256 newMin) external onlyGovernance {
+        minNFTsRequired = newMin;
+    }
+
+    function votingDelay()
+        public
+        view
+        override(Governor, GovernorSettings)
+        returns (uint256)
+    {
         return super.votingDelay();
     }
 
-    function votingPeriod() public view override(Governor, GovernorSettings) returns (uint256) {
+    function votingPeriod()
+        public
+        view
+        override(Governor, GovernorSettings)
+        returns (uint256)
+    {
         return super.votingPeriod();
     }
 
-    function proposalThreshold() public view override(Governor, GovernorSettings) returns (uint256) {
+    function proposalThreshold()
+        public
+        view
+        override(Governor, GovernorSettings)
+        returns (uint256)
+    {
         return super.proposalThreshold();
     }
 
-    function state(uint256 proposalId) public view override(Governor, GovernorTimelockControl) returns (ProposalState) {
+    function state(uint256 proposalId)
+        public
+        view
+        override(Governor, GovernorTimelockControl)
+        returns (ProposalState)
+    {
         return super.state(proposalId);
     }
 
-    function proposalNeedsQueuing(uint256 proposalId) public view override(Governor, GovernorTimelockControl) returns (bool) {
+    function proposalNeedsQueuing(uint256 proposalId)
+        public
+        view
+        override(Governor, GovernorTimelockControl)
+        returns (bool)
+    {
         return super.proposalNeedsQueuing(proposalId);
     }
 
@@ -125,7 +162,14 @@ contract LootGovernor is
         bytes[] memory calldatas,
         bytes32 descriptionHash
     ) internal override(Governor, GovernorTimelockControl) returns (uint48) {
-        return super._queueOperations(proposalId, targets, values, calldatas, descriptionHash);
+        return
+            super._queueOperations(
+                proposalId,
+                targets,
+                values,
+                calldatas,
+                descriptionHash
+            );
     }
 
     function _executeOperations(
@@ -135,7 +179,13 @@ contract LootGovernor is
         bytes[] memory calldatas,
         bytes32 descriptionHash
     ) internal override(Governor, GovernorTimelockControl) {
-        super._executeOperations(proposalId, targets, values, calldatas, descriptionHash);
+        super._executeOperations(
+            proposalId,
+            targets,
+            values,
+            calldatas,
+            descriptionHash
+        );
     }
 
     function _cancel(
@@ -147,11 +197,21 @@ contract LootGovernor is
         return super._cancel(targets, values, calldatas, descriptionHash);
     }
 
-    function _executor() internal view override(Governor, GovernorTimelockControl) returns (address) {
+    function _executor()
+        internal
+        view
+        override(Governor, GovernorTimelockControl)
+        returns (address)
+    {
         return super._executor();
     }
 
-    function supportsInterface(bytes4 interfaceId) public view override(Governor) returns (bool) {
+    function supportsInterface(bytes4 interfaceId)
+        public
+        view
+        override(Governor)
+        returns (bool)
+    {
         return super.supportsInterface(interfaceId);
     }
 }
