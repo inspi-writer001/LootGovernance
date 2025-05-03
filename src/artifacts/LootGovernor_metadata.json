@@ -2128,11 +2128,11 @@
 			]
 		},
 		"src/MinifiedLootGovernor.sol": {
-			"keccak256": "0xc663928d25da6d09ff35a60298b2656aac5e37c76a851b50bbc40bc902e517f2",
+			"keccak256": "0x373b9615342dfb719aade68634a371ce5c1649bf15d34cb55c7098505acbec23",
 			"license": "MIT",
 			"urls": [
-				"bzz-raw://12a46df11a131f166bed04cd640a1a003a4a140bc248dc0e94703f1dce1d40f0",
-				"dweb:/ipfs/QmerQngUpHKtPkj4qHkKo74ymxCccvMSnqe9qrSvzeuxfc"
+				"bzz-raw://515b6f63f32a3c98f56e85b398819649b261f1660eab5f448f967c1889d2bd85",
+				"dweb:/ipfs/QmYy9btyTSBKCtX9MRxWUuKcMJPGMC9g92KKjj8yCn5xr4"
 			]
 		}
 	},
