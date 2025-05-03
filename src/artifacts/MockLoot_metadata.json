@@ -1,6 +1,6 @@
 {
 	"compiler": {
-		"version": "0.8.20+commit.a1b79de6"
+		"version": "0.8.23+commit.f704f362"
 	},
 	"language": "Solidity",
 	"output": {
@@ -723,7 +723,7 @@
 		},
 		"optimizer": {
 			"enabled": true,
-			"runs": 200
+			"runs": 50
 		},
 		"remappings": []
 	},
@@ -1049,11 +1049,11 @@
 			]
 		},
 		"src/MinifiedLootGovernor.sol": {
-			"keccak256": "0xee39bde99e15fffc3c73f69f625f78bdae68d0a190d6c3ad4ac180347dce755c",
+			"keccak256": "0x3171c6de8e83413c55d9f02d5d319fccce4bb758f2b74c5b2316107e8065bf67",
 			"license": "MIT",
 			"urls": [
-				"bzz-raw://d13c155d9a03ce60ffccf37d843e7a671d557b8c33d7a3bde2fff44ecd3f7511",
-				"dweb:/ipfs/QmXJdiMEEevDJUuVrTCskGj4SqVa6MJ8byzaseMbqDzgy2"
+				"bzz-raw://ab689775ee62b627d208a326966bceaf0a9c9717617a333f3fa1b4a95abac4e2",
+				"dweb:/ipfs/QmUFuE3qWTDF2mxD2hRegkYbRBAAhvSfnST1DeAwhjafBe"
 			]
 		}
 	},

@@ -1,58 +1,15 @@
 // File: MockLoot.sol
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
 
-import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
-
-contract MockLoot is ERC721, Ownable {
-    uint256 private _tokenIdCounter;
-    uint256 public constant MAX_SUPPLY = 8000;
-
-    constructor() ERC721("Mock Loot", "MLOOT") Ownable(msg.sender) {
-        _tokenIdCounter = 1;
-    }
-
-    function mint(address to) external {
-        require(_tokenIdCounter <= MAX_SUPPLY, "Max supply reached");
-        _safeMint(to, _tokenIdCounter++);
-    }
-
-    function mintMultiple(address to, uint256 amount) external {
-        require(
-            _tokenIdCounter + amount - 1 <= MAX_SUPPLY,
-            "Would exceed max supply"
-        );
-        for (uint256 i = 0; i < amount; i++) {
-            _safeMint(to, _tokenIdCounter++);
-        }
-    }
-}
-
-// File: LootTimelock.sol
-
-pragma solidity ^0.8.19;
-
-import "@openzeppelin/contracts/governance/TimelockController.sol";
-
-contract LootTimelock is TimelockController {
-    constructor(
-        uint256 minDelay,
-        address[] memory proposers,
-        address[] memory executors,
-        address admin
-    ) TimelockController(minDelay, proposers, executors, admin) {}
-}
-
-// File: LootGovernor.sol
-
-pragma solidity ^0.8.19;
+pragma solidity 0.8.23;
 
 import "@openzeppelin/contracts/governance/Governor.sol";
 import "@openzeppelin/contracts/governance/extensions/GovernorSettings.sol";
 import "@openzeppelin/contracts/governance/extensions/GovernorCountingSimple.sol";
 import "@openzeppelin/contracts/governance/extensions/GovernorTimelockControl.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
+import "@openzeppelin/contracts/utils/math/SafeCast.sol";
+
 
 contract LootGovernor is
     Governor,
@@ -75,8 +32,8 @@ contract LootGovernor is
     )
         Governor("LootGovernor")
         GovernorSettings(
-            uint48(_votingDelay),
-            uint32(_votingPeriod),
+            SafeCast.toUint48(_votingDelay),
+            SafeCast.toUint32(_votingPeriod),
             _proposalThreshold
         )
         GovernorTimelockControl(_timelock)
